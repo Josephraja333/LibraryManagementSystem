@@ -1,24 +1,25 @@
 package entities.users
 import org.example.ui.UserAuthUI
+import org.example.util.CommonUtil
 
 abstract class UserAccountDetails(
-    var userID: String = "",
+    var name: String = "",
     var password: String = "",
     var phoneNumber: String = "",
     var cardNumber: String = "",
-    var cardBalance: Int = 0
-) : UserSettings {
+    var cardBalance: Int = 0,
+)  {
 
-    constructor(memberId: String) : this() {
-        userID = memberId
+    constructor(memberID : String) : this() {
+        this.name = UserAuthUI.getUserNameInput()
         phoneNumber = UserAuthUI.getPhoneNumberInput()
         password = UserAuthUI.getPasswordInput()
         cardBalance = (5000..10000).random()
         cardNumber = getCardNumberInput()
-        println("This is you Login ID: $memberId")
+        println("This is your Member Login ID: $memberID")
     }
 
-    override fun changePassword() {
+    private fun changePassword() {
         while (true) {
             val currentPassword = UserAuthUI.getPasswordInput()
             if (currentPassword == password) break
@@ -29,35 +30,42 @@ abstract class UserAccountDetails(
         println("Password Changed Successfully")
     }
 
-    override fun changePhoneNumber() {
+    private fun changePhoneNumber() {
         phoneNumber = UserAuthUI.getPhoneNumberInput()
         println("Phone Number Changed Successfully")
     }
 
-    override fun changeCardNumber() {
+    private fun changeName() {
+        phoneNumber = UserAuthUI.getUserNameInput()
+        println("User Name Changed Successfully")
+    }
+
+    private fun changeCardNumber() {
         cardNumber = getCardNumberInput()
         println("Card Number Changed Successfully")
     }
 
     private fun getCardNumberInput() = generateSequence {
-        UserAuthUI.getInput("Enter your Credit/Debit Card number: ") { it.toLong() }
+        CommonUtil.getInput("Enter your Credit/Debit Card number: ") { it.toLong() }
             .toString()
             .also { if (it.length != 16) println("Enter a valid card number") }
     }.first { it.length == 16 }
 
-    override fun showCardBalance() = println(cardBalance.toString() + "rs")
+    fun showCardBalance() = println(cardBalance.toString() + "rs")
 
-    override fun settings() {
+    fun settings() {
         while (true) {
             println()
             println("Enter the corresponding number to the options\n0 to Exit")
-            println("1.Change your Password")
-            println("2.Change your Phone Number")
-            println("3.Change your Credit/Debit Number")
+            println("1.Change your Name")
+            println("2.Change your Password")
+            println("3.Change your Phone Number")
+            println("4.Change your Credit/Debit Number")
             when (readln()) {
-                "1" -> changePassword()
-                "2" -> changePhoneNumber()
-                "3" -> changeCardNumber()
+                "1" -> changeName()
+                "2" -> changePassword()
+                "3" -> changePhoneNumber()
+                "4" -> changeCardNumber()
                 "0" -> break
                 else -> println("Enter a valid option")
             }

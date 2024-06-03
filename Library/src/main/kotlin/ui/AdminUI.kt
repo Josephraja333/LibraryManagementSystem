@@ -4,10 +4,10 @@ import org.example.entities.book.Book
 import org.example.dataManager.BookDataManager
 import org.example.dataManager.LibrarianDataManager
 import entities.users.Admin
-import org.example.util.AdminUtil
-import org.example.util.ENTER_VALID_OPTION
-import org.example.util.NO_LIBRARIANS_AVAILABLE
-import org.example.util.SUBSCRIPTION_AMOUNT
+import org.example.dataManager.MemberDataManager
+import org.example.util.*
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 object AdminUI {
     fun displayLibrarians() {
@@ -16,35 +16,12 @@ object AdminUI {
             println(NO_LIBRARIANS_AVAILABLE)
             return
         }
-        librarians.forEachIndexed { index, librarian -> println("${index + 1}.${librarian.name} ID:${librarian.userID}") }
+        librarians.forEachIndexed { index, librarian -> println("${index + 1}.${librarian.name} ID:${librarian.librarianID}") }
     }
 
     fun checkSubscriptionPaidBy() {
-        Admin.subscriptionPaidBy.forEach {
-            println("Subscription paid by member $it")
-            Admin.cardBalance += SUBSCRIPTION_AMOUNT
-        }
-        Admin.subscriptionPaidBy.clear()
-    }
-
-    fun checkAddBookRequests(){
-        while (Admin.addBookRequests.isNotEmpty()) {
-            println("Choose an option accept\n0 to Exit")
-            Admin.addBookRequests.forEachIndexed { index, book ->
-                book.split(" ")
-                    .let { println("${index+1}.BookName=${it[0]}, AuthorName=${it[1]}, Category=${it[2]}") }
-            }
-
-            val choice = UserAuthUI.getInput("Choose an option to see the requested books\n0 to Exit\n") { it.toInt() }.takeIf { it!=0 }?:return
-            if (choice > Admin.addBookRequests.size) {
-                println(ENTER_VALID_OPTION)
-                continue
-            }
-
-            AdminUtil.addRequestedBookToLibrary(choice-1)
-            println("Book Successfully added")
-        }
-        println("Request Inbox Empty")
+        val members = MemberDataManager.getMembers().filter { ChronoUnit.DAYS.between(it.paymentInfo.lastSubscriptionPaymentDate, LocalDate.now()) <=7 }
+        members.forEach { println("Subscription paid by member ${it.name}") }
     }
 
     fun removeBook() {
@@ -55,27 +32,24 @@ object AdminUI {
                 return
             }
             books.forEachIndexed { index, book ->  println("${index+1}.${book.bookName}")}
-            val choice = UserAuthUI.getInput("Choose a book to remove\n0 to Exit\n") { it.toInt() }.takeIf { it!=0 }?:return
+            val choice = CommonUtil.getInput("Choose a book to remove\n0 to Exit\n") { it.toInt() }.takeIf { it!=0 }?:return
             if(choice>books.size){
                 println(ENTER_VALID_OPTION)
                 continue
             }
 
-            if (AdminUtil.removeBookFromLibrary(choice,books)) println("Book removed successfully")
-            else println("Someone already borrowed the book, so it can't be removed for now")
+            if (MemberDataManager.getMembers()
+                    .flatMap { it.borrowingInfo.currentlyBorrowedBooks.map { borrowedBook -> borrowedBook.bookName } }
+                    .contains(books[choice-1].bookName)) {
+                println("Someone already borrowed the book, so it can't be removed for now")
+            }
+            else {
+                BookDataManager.removeBook(books[choice-1])
+                println("Book removed successfully")
+            }
+
             break
         }
-    }
-
-    fun creditSalary() {
-        val librarians = LibrarianDataManager.getLibrarians()
-        if(librarians.isEmpty()){
-            println(NO_LIBRARIANS_AVAILABLE)
-            return
-        }
-        val totalSalaryCredited = AdminUtil.payLibrarians(librarians)
-        if(totalSalaryCredited!=0) println("${totalSalaryCredited}rs paid in total")
-        else println("Everyone has already been paid.")
     }
 
     fun addBookToLibrary() {
@@ -98,7 +72,7 @@ object AdminUI {
         println("Ent er the corresponding number to remove librarian\n0 to Exit")
         librarians.forEachIndexed { index, librarian -> println("${index+1}.${librarian.name}") }
 
-        val index = UserAuthUI.getInput("") { it.toInt() }.takeIf { it != 0 && it <= librarians.size } ?: run {
+        val index = CommonUtil.getInput("") { it.toInt() }.takeIf { it != 0 && it <= librarians.size } ?: run {
             println("Option is Invalid")
             return
         }
@@ -107,5 +81,19 @@ object AdminUI {
     }
 
     fun printUserDetails() =
-        println("Name: ${Admin.adminName}\nID: ${Admin.userID}\nPhone Number: ${Admin.phoneNumber}")
+        println("Name: ${Admin.name}\nID: ${Admin.adminID}\nPhone Number: ${Admin.phoneNumber}")
+
+    fun showCardBalance() = Admin.showCardBalance()
+
+    fun settings() = Admin.settings()
+
+    fun printFilteredBooks() = BooksUtil.printFilteredBooks()
+
+    fun searchBooks() = BooksUtil.displayBooksBySearch()
+
+    fun showAllBooks() = BooksUtil.showAllBooks()
+
+    fun displayMembers() = StaffUtil.displayMembers()
+
+    fun showMemberDetails() = StaffUtil.getMemberDetails()
 }

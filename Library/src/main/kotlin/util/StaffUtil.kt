@@ -2,7 +2,7 @@ package org.example.util
 
 import org.example.dataManager.MemberDataManager
 import entities.users.member.MemberStatus
-import org.example.ui.UserAuthUI
+import org.example.ui.MemberUI
 
 object StaffUtil {
     fun getMemberDetails() {
@@ -13,8 +13,8 @@ object StaffUtil {
             return
         }
         println("Enter the corresponding number to look at the member's details\n0 to Exit")
-        members.forEachIndexed { index, member -> println("${index + 1}.${member.name} ID:${member.userID}") }
-        val index = UserAuthUI.getInput("") { it.toInt() }.takeIf { it != 0 } ?: return
+        members.forEachIndexed { index, member -> println("${index + 1}.${member.name} ID:${member.memberID}") }
+        val index = CommonUtil.getInput("") { it.toInt() }.takeIf { it != 0 } ?: return
         val member = members[index - 1]
 
         while (true) {
@@ -23,18 +23,18 @@ object StaffUtil {
                 "0" -> break
 
                 "1" -> {
-                    val borrowedBooks = member.currentlyBorrowedBooks
+                    val borrowedBooks = member.borrowingInfo.currentlyBorrowedBooks
                     if (borrowedBooks.isEmpty()) println("No books have been borrowed")
                     else borrowedBooks.forEach { println(it) }
                 }
 
                 "2" -> {
-                    val bookHistory = member.history
+                    val bookHistory = member.borrowingInfo.history
                     if (bookHistory.isEmpty()) println("No actions is taken")
                     else bookHistory.forEach { println(it) }
                 }
 
-                "3" -> member.printUserDetails()
+                "3" -> MemberUI.printUserDetails(member)
 
                 else -> println(ENTER_VALID_OPTION)
             }
@@ -49,9 +49,9 @@ object StaffUtil {
         }
         members.forEachIndexed { index, member ->
             when (member.memberStatus) {
-                MemberStatus.BANNED -> println("${index + 1}.${member.name} ID:${member.userID} ${MemberStatus.BANNED}")
-                MemberStatus.TEMPORARILY_REMOVED -> println("${index + 1}.${member.name} ID:${member.userID} ${MemberStatus.TEMPORARILY_REMOVED}")
-                MemberStatus.AVAILABLE -> println("${index + 1}.${member.name} ID:${member.userID} ${MemberStatus.AVAILABLE}")
+                MemberStatus.BANNED -> println("${index + 1}.${member.name} ID:${member.memberID} ${MemberStatus.BANNED}")
+                MemberStatus.TEMPORARILY_REMOVED -> println("${index + 1}.${member.name} ID:${member.memberID} ${MemberStatus.TEMPORARILY_REMOVED}")
+                MemberStatus.AVAILABLE -> println("${index + 1}.${member.name} ID:${member.memberID} ${MemberStatus.AVAILABLE}")
             }
         }
     }

@@ -2,7 +2,6 @@ package org.example.util
 
 import org.example.entities.book.Book
 import org.example.dataManager.BookDataManager
-import org.example.ui.UserAuthUI.getInput
 
 object BooksUtil {
     fun showAllBooks() = BookDataManager.getBooks().forEachIndexed { index, book -> println("${index + 1}.${book}")}
@@ -28,7 +27,7 @@ object BooksUtil {
                     println("Select an Author")
                     val authors = books.map { it.author }.toSet()
                     authors.forEachIndexed { index, author -> println("${index + 1}.$author") }
-                    val choice = getInput("") { it.toInt() }
+                    val choice = CommonUtil.getInput("") { it.toInt() }
                     val selectedAuthor = authors.elementAt(choice - 1).takeIf { choice != 0 && choice <= authors.size } ?: continue
                     return books.filter { it.author == selectedAuthor }
                 }
@@ -37,7 +36,7 @@ object BooksUtil {
                     println("Select an Category")
                     val category = books.map { it.category }.toSet()
                     category.forEachIndexed { index, it -> println("${index + 1}.$it") }
-                    val choice = getInput("") { it.toInt() }
+                    val choice = CommonUtil.getInput("") { it.toInt() }
                     val selectedCategory =
                         category.elementAt(choice - 1).takeIf { choice != 0 && choice <= category.size } ?: continue
                     return books.filter { it.category == selectedCategory }
@@ -70,7 +69,17 @@ object BooksUtil {
         return false
     }
 
+    fun getBookDetails(): String {
+        println("Enter Book Name")
+        val bookName = generateSequence { readln().also { if(it.isEmpty()) println("Enter a valid book name") } }.first()
+        println("Enter Author Name")
+        val authorName = generateSequence { readln().also { if(it.isEmpty()) println("Enter a valid author name") } }.first()
+        println("Enter Book Category")
+        val category = generateSequence { readln().also { if(it.isEmpty()) println("Enter a valid category name") } }.first()
+        return "$bookName $authorName $category"
+    }
+
     fun printFilteredBooks() = filterBooks().forEach { println(it) }
 
-    fun searchBooks() = searchBook().forEachIndexed { index, book -> println("${index + 1}.$book") }
+    fun displayBooksBySearch() = searchBook().forEachIndexed { index, book -> println("${index + 1}.$book") }
 }

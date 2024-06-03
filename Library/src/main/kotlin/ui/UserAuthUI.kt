@@ -1,26 +1,17 @@
 package org.example.ui
 
+import entities.users.Admin
 import entities.users.Librarian
 import org.example.dataManager.LibrarianDataManager
 import org.example.dataManager.MemberDataManager
 import entities.users.UserAccountDetails
 import entities.users.member.Member
 import entities.users.member.MemberStatus
-import org.example.util.ENTER_VALID_OPTION
+import org.example.adminFunctions
 
 object UserAuthUI {
-    fun <T> getInput(msg: String, transform: (String) -> T): T {
-        while (true) {
-            print(msg)
-            try {
-                return transform(readln())
-            } catch (e: Exception) {
-                println(ENTER_VALID_OPTION)
-            }
-        }
-    }
 
-    private fun getUserNameInput(): String {
+     fun getUserNameInput(): String {
         println("Enter Name:")
         while (true) {
             val name = readln()
@@ -61,8 +52,7 @@ object UserAuthUI {
     fun createMember() {
         println()
         while (true) {
-            val name = getUserNameInput()
-            val member = Member(name)
+            val member = Member()
             MemberDataManager.setMember(member)
             break
         }
@@ -74,7 +64,7 @@ object UserAuthUI {
         println("Enter Librarian ID")
         while (true){
             librarianID = readln().let { if (!it.contains("L")) "L$it" else it }
-            if(librarianList.none { it.userID.equals(librarianID, true) }){
+            if(librarianList.none { it.librarianID.equals(librarianID, true) }){
                 println("Enter a valid ID")
                 continue
             }
@@ -92,9 +82,9 @@ object UserAuthUI {
             }
         }
 
-        val librarian = librarianList.find { it.userID.equals(librarianID,true) && it.password == password }
+        val librarian = librarianList.find { it.librarianID.equals(librarianID,true) && it.password == password }
         if (librarian != null) return librarian
-        else if(librarianList.find { it.userID.equals(librarianID,true) || it.password == password }!=null) println("Password Incorrect")
+        else if(librarianList.find { it.librarianID.equals(librarianID,true) || it.password == password }!=null) println("Password Incorrect")
         else println("Account not found")
         return null
     }
@@ -105,15 +95,20 @@ object UserAuthUI {
         println("Enter Member ID")
         while (true){
             memberID = readln().let { if (!it.contains("M",true)) "M$it" else it }
-            if(membersList.none { it.userID.equals(memberID, true) }){
+            if(membersList.none { it.memberID.equals(memberID, true) }){
                 println("Enter a valid ID")
                 continue
             }
             break
         }
 
-        if (MemberDataManager.getMembers().any { it.userID == memberID && it.memberStatus == MemberStatus.BANNED }) {
+        if (MemberDataManager.getMembers().any { it.memberID == memberID && it.memberStatus == MemberStatus.BANNED }) {
             println("This account is banned")
+            return null
+        }
+
+        else if (MemberDataManager.getMembers().any { it.memberID == memberID && it.memberStatus == MemberStatus.TEMPORARILY_REMOVED }) {
+            println("This account is temporarily removed")
             return null
         }
 
@@ -128,10 +123,10 @@ object UserAuthUI {
             }
         }
 
-        val member = membersList.find { it.userID.equals(memberID,true) && it.password == password }
+        val member = membersList.find { it.memberID.equals(memberID,true) && it.password == password }
 
         when {
-            member == null && membersList.find { it.userID.equals(memberID, true) || it.password == password } != null -> println("Password is incorrect")
+            member == null && membersList.find { it.memberID.equals(memberID, true) || it.password == password } != null -> println("Password is incorrect")
             member == null -> println("Account not found")
             member.memberStatus == MemberStatus.AVAILABLE -> return member
             else -> println("Account temporarily removed")
@@ -147,5 +142,15 @@ object UserAuthUI {
         userAccountDetail.password = getPasswordInput()
         println("New password set!")
         return true
+    }
+
+    fun loginAdmin(): Boolean {
+        println("Enter Admin ID:")
+        val adminID = readln().let { if (!it.contains("A",true)) "A$it" else it }
+        println("Enter Password:")
+        val password = readln()
+        if (adminID.equals(Admin.adminID, true) && password == Admin.password) return true
+        else println("Your Password is incorrect try again")
+        return false
     }
 }

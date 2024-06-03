@@ -1,5 +1,6 @@
 package org.example.ui
 
+import entities.users.Admin
 import org.example.entities.book.Book
 import org.example.dataManager.BookDataManager
 import org.example.dataManager.BookRequestManager
@@ -7,9 +8,9 @@ import org.example.dataManager.MemberDataManager.getMembers
 import entities.users.member.Member
 import entities.users.member.MemberStatus
 import org.example.util.BooksUtil
-import org.example.util.DEFAULT_FINE_AMOUNT
+import org.example.util.CommonUtil
 import org.example.util.ENTER_VALID_OPTION
-import org.example.util.MemberUtil
+import org.example.util.SUBSCRIPTION_AMOUNT
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -23,17 +24,22 @@ object MemberUI {
 
     private fun getRatingsInput(): Float {
         while (true) {
-            return UserAuthUI.getInput("Did you like the book rate it between 0 to 5.0: ") { it.toFloat() }
+            return CommonUtil.getInput("Did you like the book rate it between 0 to 5.0: ") { it.toFloat() }
                 .takeIf { it < 5.1 } ?: continue
         }
     }
 
     fun checkSubscriptionValidity(member: Member) {
-        val daysDifference = ChronoUnit.DAYS.between(member.lastSubscriptionPaymentDate, LocalDate.now())
+        val daysDifference = ChronoUnit.DAYS.between(member.paymentInfo.lastSubscriptionPaymentDate, LocalDate.now())
         if (daysDifference > 30) {
             println("Subscription period ended")
-            if (MemberUtil.paySubscription(member)) println("Subscription amount of 300 is paid using ${member.cardNumber}")
-            else temporarilyRemove(member)
+            if (member.cardBalance - 300 < 0) temporarilyRemove(member)
+            else {
+                member.cardBalance -= 300
+                member.paymentInfo.lastSubscriptionPaymentDate = LocalDate.now()
+                Admin.cardBalance += SUBSCRIPTION_AMOUNT
+                println("Subscription amount of 300 is paid using ${member.cardNumber}")
+            }
         }
     }
 
@@ -48,10 +54,12 @@ object MemberUI {
         }
 
         membersList.forEachIndexed { it, eachMember -> println("${it + 1}.${eachMember.name}") }
-        val userChoice = requestHelp().take(3)
+        val userChoice = requestHelp()
         userChoice.forEach {
-            member.helpRequested.add(membersList[it - 1].name)
-            membersList[it - 1].helpAskedByOtherMembers.add("${member.name} ${member.currentFineAmount}rs")
+            if(it<=membersList.size){
+                member.helpInfo.helpRequested.add(membersList[it - 1].name)
+                membersList[it - 1].helpInfo.helpAskedByOtherMembers.add("${member.name} ${member.paymentInfo.fineAmount}rs")
+            }
         }
         println("Request sent, Your account will be banned if you didn't get help")
     }
@@ -63,32 +71,37 @@ object MemberUI {
     }
 
     fun helpMember(member: Member) {
-        while (member.helpAskedByOtherMembers.isNotEmpty()) {
+        while (member.helpInfo.helpAskedByOtherMembers.isNotEmpty()) {
             println("Other member's in the community is asking you to help them")
             println("Enter the corresponding number to check the person (or) 0 to Exit")
-            member.helpAskedByOtherMembers.forEachIndexed { index, it -> println("${index + 1}.$it") }
-            val choice = UserAuthUI.getInput("") { it.toInt() }.takeIf { it != 0 } ?: break
+            member.helpInfo.helpAskedByOtherMembers.forEachIndexed { index, it -> println("${index + 1}.$it") }
+            val choice = CommonUtil.getInput("") { it.toInt() }.takeIf { it != 0 } ?: break
 
-            if (choice > member.helpAskedByOtherMembers.size) {
+            if (choice > member.helpInfo.helpAskedByOtherMembers.size) {
                 println(ENTER_VALID_OPTION)
                 continue
             }
 
-            val (personName, amountToBePaid) = member.helpAskedByOtherMembers[choice - 1].split(" ")
+            val (personName, amountToBePaid) = member.helpInfo.helpAskedByOtherMembers[choice - 1].split(" ")
             val amountToPay = amountToBePaid.removeSuffix("rs").toInt()
 
             when (getYesOrNoInput()) {
                 "y" -> {
-                    if (MemberUtil.helpMember(member, personName, choice - 1, amountToPay)) {
+                    if (member.cardBalance - amountToPay < 0) println("You don't have enough money")
+                    else {
+                        getMembers().find { it.name == personName }
+                            ?.let { it.memberStatus = MemberStatus.AVAILABLE }
+                        member.cardBalance -= amountToPay
+                        member.helpInfo.helpAskedByOtherMembers.removeAt(choice)
                         println("Fine amount of ${amountToPay}rs Paid Using Card Number ${member.cardNumber}")
                         println("${member.cardBalance}rs is left in your card\nThanks for helping other members in the community")
-                    } else println("You don't have enough money")
+                    }
                 }
 
-                "n" -> member.helpAskedByOtherMembers.removeAt(choice - 1)
+                "n" -> member.helpInfo.helpAskedByOtherMembers.removeAt(choice - 1)
             }
 
-            MemberUtil.removeHelpRequested(personName, member.name)
+            getMembers().find { it.name==personName }?.helpInfo?.helpRequested?.remove(member.name)
         }
     }
 
@@ -99,13 +112,11 @@ object MemberUI {
             return
         }
         val result = BooksUtil.searchBook()
-        if (result.isEmpty()) {
-            println("No matches found")
-            return
-        }
+        if (result.isEmpty()) return
+
         result.forEachIndexed { index, book -> println("${index + 1}.$book") }
         println("Enter the corresponding number to select\n0 to Exit")
-        val choice = UserAuthUI.getInput("") { it.toInt() }.takeIf { it != 0 && it <= books.size } ?: return
+        val choice = CommonUtil.getInput("") { it.toInt() }.takeIf { it != 0 && it <= books.size } ?: return
         requestBook(result.elementAt(choice - 1), member)
     }
 
@@ -126,7 +137,7 @@ object MemberUI {
                 books = BooksUtil.filterBooks().takeIf { it.isNotEmpty() } ?: return
                 println("Enter the corresponding number to select\n0 to Exit")
                 books.forEachIndexed { count, book -> println("${count + 1}.$book") }
-                index = UserAuthUI.getInput("") { it }
+                index = CommonUtil.getInput("") { it }
             } else if (!index.matches("\\d+".toRegex()) || index.length != 1) {
                 println("Enter a valid option")
                 continue
@@ -149,20 +160,24 @@ object MemberUI {
     }
 
     private fun requestBook(book: Book, member: Member) {
-        if (book.bookName in member.currentlyBorrowedBooks.map { it.bookName }) {
+        if (book.bookName in member.borrowingInfo.currentlyBorrowedBooks.map { it.bookName }) {
             println("You have already borrowed this book")
             return
-        } else if (book.bookName in member.booksRequested.map { it.bookName }) {
+        } else if (book.bookName in member.borrowingInfo.booksRequested.map { it.bookName }) {
             println("Book already requested, kindly wait until a librarian accepts it")
             return
+        } else if(member.borrowingInfo.currentlyBorrowedBooks.size==5){
+            println("You have more than 5 books, kindly return a book to request this")
+            return
         }
-        member.booksRequested.add(book)
+
+        member.borrowingInfo.booksRequested.add(book)
         println("Book requested")
     }
 
     fun returnBook(member: Member) {
         println()
-        val currentlyBorrowedBooks = member.currentlyBorrowedBooks
+        val currentlyBorrowedBooks = member.borrowingInfo.currentlyBorrowedBooks
         if (currentlyBorrowedBooks.isEmpty()) {
             println("No books have been borrowed")
             return
@@ -170,54 +185,52 @@ object MemberUI {
         println("Enter the corresponding number to select\n0 to Exit")
         currentlyBorrowedBooks.forEachIndexed { index, book -> println("${index + 1}.${book.bookName}") }
 
-        val index = UserAuthUI.getInput("") { it.toInt() }
+        val index = CommonUtil.getInput("") { it.toInt() }
         if (index == 0 || index > currentlyBorrowedBooks.size) return
         val borrowedBook = currentlyBorrowedBooks.elementAt(index - 1)
         val books = BookDataManager.getBooks().takeIf { it.isNotEmpty() } ?: return
         val book = books[books.indexOfFirst { it.bookName == borrowedBook.bookName }]
         val timesBorrowed = currentlyBorrowedBooks.elementAt(index - 1).bookRecord.timesBorrowed
 
-        if (member.currentFineAmount == 0) member.currentFineAmount = DEFAULT_FINE_AMOUNT
-
         book.bookRecord.ratings = if (timesBorrowed != 0) getRatingsInput() / timesBorrowed else getRatingsInput()
         print("Write a review of the book: ")
         book.bookRecord.reviews.add(member.name + ": " + readln())
         book.bookRecord.timesBorrowed++
 
-        member.history.add(borrowedBook.bookName + " is returned")
-        println(member.history.last())
+        member.borrowingInfo.history.add(borrowedBook.bookName + " is returned")
+        println(member.borrowingInfo.history.last())
 
-        if (ChronoUnit.DAYS.between((member.booksBorrowedTime[book.bookName]), LocalDate.now()) > 30) {
-            if (member.cardBalance - member.currentFineAmount < 0) {
+        if (ChronoUnit.DAYS.between((member.borrowingInfo.booksBorrowedTime[book.bookName]), LocalDate.now()) > 30) {
+            if (member.cardBalance - member.paymentInfo.fineAmount < 0) {
                 temporarilyRemove(member)
                 return
             } else {
-                member.cardBalance -= member.currentFineAmount
+                member.cardBalance -= member.paymentInfo.fineAmount
                 println("Book borrowing time expired")
                 println(
-                    "Fine amount of ${member.currentFineAmount}rs Payed Using Card Number ${
+                    "Fine amount of ${member.paymentInfo.fineAmount}rs Payed Using Card Number ${
                         member.cardNumber.replaceRange(
                             0 until 10,
                             "*".repeat(10)
                         )
                     }"
                 )
-                member.history.add(
-                    "Fine amount of ${member.currentFineAmount}rs payed for " + member.currentlyBorrowedBooks.elementAt(
+                member.borrowingInfo.history.add(
+                    "Fine amount of ${member.paymentInfo.fineAmount}rs payed for " + member.borrowingInfo.currentlyBorrowedBooks.elementAt(
                         index - 1
                     ).bookName
                 )
-                member.currentFineAmount += member.currentFineAmount
+                member.paymentInfo.fineAmount += member.paymentInfo.fineAmount
                 println("${member.cardBalance}rs is left in your card\nWarning: Next time the fine amount would be $member.currentFineAmount")
             }
         }
-        member.booksBorrowedTime.remove(currentlyBorrowedBooks.elementAt(index - 1).bookName)
-        currentlyBorrowedBooks.remove(member.currentlyBorrowedBooks.elementAt(index - 1))
+        member.borrowingInfo.booksBorrowedTime.remove(currentlyBorrowedBooks.elementAt(index - 1).bookName)
+        currentlyBorrowedBooks.remove(member.borrowingInfo.currentlyBorrowedBooks.elementAt(index - 1))
     }
 
     private fun requestHelp(): MutableList<Int> {
         while (true) {
-            println("Enter choice with space separated integers (max 3)")
+            println("Enter choice with space separated integers")
             while (true) {
                 try {
                     return readln().split(" ").map { it.toInt() }.toMutableList()
@@ -228,27 +241,25 @@ object MemberUI {
         }
     }
 
-    fun requestNewBook(memberID: String, memberName: String) {
-        println("Enter Book Name")
-        val bookName = readln()
-        println("Enter Author Name")
-        val authorName = readln()
-        println("Enter Book Category")
-        val category = readln()
-        sendBookRequestToLibrarians("$bookName $authorName $category by $memberName ID: $memberID")
-    }
+    fun requestNewBook(memberID: String, memberName: String) =
+        sendBookRequestToLibrarians("${BooksUtil.getBookDetails()} by $memberName ID: $memberID")
 
     fun printBorrowedBooks(member: Member) {
-        if (member.currentlyBorrowedBooks.isEmpty()) println("No books have been borrowed")
-        else member.currentlyBorrowedBooks.forEach { println(it) }
+        if (member.borrowingInfo.currentlyBorrowedBooks.isEmpty()) println("No books have been borrowed")
+        else member.borrowingInfo.currentlyBorrowedBooks.forEach { println(it) }
     }
 
     fun printHistory(member: Member) {
-        val bookHistory = member.history
+        val bookHistory = member.borrowingInfo.history
         if (bookHistory.isEmpty()) println("No actions is taken by the member")
         else bookHistory.forEach { println(it) }
     }
 
     fun printUserDetails(member: Member) =
-        println("Name: ${member.name}\nUser ID: ${member.userID}\nPhone Number: ${member.phoneNumber}")
+        println("Name: ${member.name}\nUser ID: ${member.memberID}\nPhone Number: ${member.phoneNumber}")
+
+    fun showCardBalance(member: Member) = member.showCardBalance()
+
+    fun settings(member: Member) = member.settings()
+
 }
